@@ -74,22 +74,160 @@ Do the following:
 
 ```{r}
 # Parallel Trends plot
+
+#California (2014/01/01) and Montana (2016/01/01)
+
+medicaid_expansion %>%
+  filter(State %in% c("California","Montana")) %>%
+  filter(year >= 2008 & year <= 2020) %>%
+  ggplot() + 
+  geom_point(aes(x = year, 
+                 y = uninsured_rate, 
+                 color = State)) +
+  geom_line(aes(x = year, 
+                y = uninsured_rate, 
+                color = State)) +
+  geom_vline(aes(xintercept = 2014)) +
+  theme_fivethirtyeight() +
+  theme(axis.title = element_text()) +
+  ggtitle('California and Montana Uninsured Rate \n before/after Medicaid Expansion in 2014') +
+  xlab('Year') +
+  ylab('State Uninsured Rate')
+
+```
+
+```{r}
+
+#California (2014/01/01) and Virginia (2019/01/01)
+
+medicaid_expansion %>%
+  filter(State %in% c("California","Virginia")) %>%
+  filter(year >= 2008 & year <= 2020) %>%
+  ggplot() + 
+  geom_point(aes(x = year, 
+                 y = uninsured_rate, 
+                 color = State)) +
+  geom_line(aes(x = year, 
+                y = uninsured_rate, 
+                color = State)) +
+  geom_vline(aes(xintercept = 2014)) +
+  theme_fivethirtyeight() +
+  theme(axis.title = element_text()) +
+  ggtitle('California and Virginia Uninsured Rate \n before/after Medicaid Expansion in 2014') +
+  xlab('Year') +
+  ylab('State Uninsured Rate')
+
+```
+
+```{r}
+
+#California (2014/01/01) and Utah (2020/01/01)
+
+medicaid_expansion %>%
+  filter(State %in% c("California","Utah")) %>%
+  filter(year >= 2008 & year <= 2020) %>%
+  ggplot() + 
+  geom_point(aes(x = year, 
+                 y = uninsured_rate, 
+                 color = State)) +
+  geom_line(aes(x = year, 
+                y = uninsured_rate, 
+                color = State)) +
+  geom_vline(aes(xintercept = 2014)) +
+  theme_fivethirtyeight() +
+  theme(axis.title = element_text()) +
+  ggtitle('California and Utah Uninsured Rate \n before/after Medicaid Expansion in 2014') +
+  xlab('Year') +
+  ylab('State Uninsured Rate')
+
 ```
 
 - Estimates a difference-in-differences estimate of the effect of the Medicaid expansion on the uninsured share of the population. You may follow the lab example where we estimate the differences in one pre-treatment and one post-treatment period, or take an average of the pre-treatment and post-treatment outcomes
 
 ```{r}
-# Difference-in-Differences estimation
+
+# Difference-in-Differences estimation: Using CA and Montana
+
+cm_DnD <- medicaid_expansion %>%
+  filter(State %in% c("California","Montana")) %>%
+  filter(year >= 2008 & year <= 2020) 
+cm_DnD
+
+# FIRST WAY: Difference in one pre-treatment and one post-treatment period
+
+# pre-treatment difference
+
+pre_diff <- cm_DnD %>%
+  filter(year == 2013) %>%
+  select(State, 
+         uninsured_rate) %>%
+  spread(State, 
+         uninsured_rate) %>%
+  summarise(Montana - California)
+pre_diff   #-0.00448	
+
+# post-treatment difference
+
+post_diff <- cm_DnD %>%
+  filter(year == 2015) %>%
+  select(State, 
+         uninsured_rate) %>%
+  spread(State, 
+         uninsured_rate) %>%
+  summarise(Montana - California)
+post_diff   #0.03014	
+
+# diff-in-diffs
+
+diff_in_diffs <- post_diff - pre_diff
+diff_in_diffs   #0.03462	
+
+
+# SECOND WAY: Difference in average of the pre- and post-treatment outcomes
+
+
+# pre-treatment difference
+
+pre_diff_avg <- cm_DnD %>%
+  filter(year >= 2008 & year <= 2013) %>%
+  select(State, year,
+         uninsured_rate) %>%
+  spread(State, 
+         uninsured_rate) %>%
+  summarise(mean(Montana) - mean(California)) 
+  #Montana avg uninsured rate=0.1811, CA avg = 0.1796
+
+pre_diff_avg  # 0.001460333
+
+# post-treatment difference
+
+post_diff_avg <- cm_DnD %>%
+  filter(year >= 2015 & year <= 2020) %>%
+  select(State, year,
+         uninsured_rate) %>%
+  spread(State, 
+         uninsured_rate) %>%
+  summarise(mean(Montana) - mean(California))
+post_diff_avg   # 0.0132822
+
+# diff-in-diffs in average
+
+diff_in_diffs_avg <- post_diff_avg  - pre_diff_avg 
+diff_in_diffs_avg   # 0.01182187
+
+
 ```
 
 
 ## Discussion Questions
 
 - Card/Krueger's original piece utilized the fact that towns on either side of the Delaware river are likely to be quite similar to one another in terms of demographics, economics, etc. Why is that intuition harder to replicate with this data?
-- **Answer**:
+- **Answer**: The intuition that neighboring towns may be similar to one another is harder to replicate with this data because this data is based on state-level data. States in the U.S. not only are different in demographics and economy, but also have their own governing bodies and are each politically enmeshed in a complicated relationship with the federal government. This difference among states is evident through the different ways in which states responded to the Affordable Care Act and the different timings at which states enacted Medicaid expansion. Therefore using any two neighboring states to measure the effect of Medicaid expansion is not a good comparison to make. 
 
 - What are the strengths and weaknesses of using the parallel trends assumption in difference-in-differences estimates?
-- **Answer**:
+- **Answer**: A strength of using the parallel trends assumption in diff-in-diff estimates is that we are able to use an untreated/control unit as a proper counterfactual to the treated unit. In other words, since we cannot know what the treated unit would have been like without the treatment, as long as parallel trends assumption holds, we can take the pre-and post-treatment outcomes of an untreated unit and use that to compare to those of the treated unit to measure the treatment effect. The assumption also allows researchers to make more careful estimations taking into account the passing of time and control for selection bias which one can get from a single difference estimate.  
+
+A weakness of using the parallel trends assumption is that it is a huge assumption to make, especially when the units are clearly not identical. Even if we match the treated and untreated units on baseline covariates, the very fact that the two units are different creates the possibility that their trends may differ over time. And if the parallel trends assumption does not hold, we cannot make a fair comparison to properly measure the treatment effect, since there may be a myriad confounders at play. In addition, the measured treatment effect may vary depending on the time periods observed. As shown above, looking at just one year before and after treatment, and the average of several years before and after treatment produce different diff-in-diff estimates. Depending on how we define the period where the parallel trends assumption holds true, we may be biasing the estimates.
 
 
 # Synthetic Control
