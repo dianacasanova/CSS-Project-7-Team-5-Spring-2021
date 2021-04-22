@@ -108,11 +108,16 @@ p <- medicaid_expansion %>%
                 color = State)) + 
   geom_line() +
   scale_colour_discrete(guide = 'none') + 
-  ggtitle('5 Highest Uninsured Individuals by State, 2014') +
+  ggtitle('5 Most Uninsured Individuals by State, 2014') +
   xlab('Year') +
   ylab('Uninsured Number')  + expand_limits(x = 2015)
 
 direct.label(p, method = "last.qp")
+
+
+```
+
+```{r}
 
 p <- medicaid_expansion %>% 
   filter(year <= 2014) %>%
@@ -123,7 +128,7 @@ p <- medicaid_expansion %>%
                 color = State)) + 
   geom_line() +
   scale_colour_discrete(guide = 'none') + 
-  ggtitle('5  Least Uninsured Individuals by State, 2014') +
+  ggtitle('5 Least Uninsured Individuals by State, 2014') +
   xlab('Year') +
   ylab('Uninsured Number')  + expand_limits(x = 2015)
 
@@ -133,6 +138,15 @@ direct.label(p, method = "last.qp")
 
 ```
 
+
+```{r}
+medicaid_expansion %>% 
+  filter(year == 2020) %>% 
+  mutate(num_uninsured = uninsured_rate * population) %>%
+  arrange(-num_uninsured) %>% 
+  top_n(c(5)) 
+
+```
 
 
 # Difference-in-Differences Estimation
@@ -314,18 +328,84 @@ Do the following:
 
 ```{r}
 # non-augmented synthetic control
+
+#Louisiana (2016-07-01)
+# augsynth(outcome ~ trt, unit, time, t_int, data)
+
+
+#am I making the treatment variable correctly?
+LA <-  medicaid_expansion %>% 
+  mutate(treated = as.numeric(State == "Louisiana" & year >= 2017))
+
+syn <- augsynth(uninsured_rate ~ treated, State, year, 
+               LA,
+                progfunc = "None", scm = T)
+
+synsum <- summary(syn)
+
+synsum$average_att
+synsum$l2_imbalance
+
+```
+
+```{r}
+
+plot(syn)
+
+# this looks decent !
+
 ```
 
 - Re-run the same analysis but this time use an augmentation (default choices are Ridge, Matrix Completion, and GSynth). Create the same plot and report the average ATT and L2 imbalance.
 
 ```{r}
 # augmented synthetic control
+
+rsyn <- augsynth(uninsured_rate ~ treated, State, year, 
+               LA,
+                progfunc = "Ridge", scm = T)
+
+rsynsum <- summary(rsyn)
+rsynsum$average_att
+rsynsum$l2_imbalance
+
+plot(rsyn)
+
 ```
 
 - Plot barplots to visualize the weights of the donors.
 
 ```{r}
 # barplots of weights
+
+data.frame(syn$weights) %>%
+  # change index to a column
+  tibble::rownames_to_column('State') %>%
+  ggplot() +
+  # stat = identity to take the literal value instead of a count for geom_bar()
+  geom_bar(aes(x = State, 
+               y = syn.weights),
+           stat = 'identity') +
+  theme_fivethirtyeight() +
+  theme(axis.title = element_text(),
+        axis.text.x = element_text(angle = 90)) +
+  ggtitle('Synthetic Control Weights') +
+  xlab('State') +
+  ylab('Weight') 
+
+
+data.frame(rsyn$weights) %>%
+  tibble::rownames_to_column('State') %>%
+  ggplot() +
+  geom_bar(aes(x = State, y = rsyn.weights),
+           stat = 'identity') +
+  theme_fivethirtyeight() +
+  theme(axis.title = element_text(),
+        axis.text.x = element_text(angle = 90)) +
+  ggtitle('Synthetic Control Weights') +
+  xlab('State') +
+  ylab('Weight') 
+
 ```
 
 **HINT**: Is there any preprocessing you need to do before you allow the program to automatically find weights for donor states?
@@ -334,10 +414,17 @@ Do the following:
 
 
 - What are the advantages and disadvantages of synthetic control compared to difference-in-differences estimators?
-- **Answer**: 
+
+- **Answer**: The advantage with synthetic controls is that they may allow for a more tightly fit counterfactual in the pre-treatment period if otherwise there is not a suitable unit to match Conversely, if there are several well-matched units, they allow for the combination of those data without having to choose one specific unit to match over time. 
+
+A disadvantage could be processing time (depending on if augmentation is used and what method), and more generally, more data is required to be collected in order to create a synthetic control. On a substantive level, there may also be some research questions that are not suitable to answer with synthetic controls as opposed to diff-in-diffs. It may not make sense to think of the counterfactual as a weighted sum of other units. (Even in this case, I'm wondering how to approach why particular donor states are chosen or not chosen.)
 
 - One of the benefits of synthetic control is that the weights are bounded between [0,1] and the weights must sum to 1. Augmentation might relax this assumption by allowing for negative weights. Does this create an interpretation problem, and how should we balance this consideration against the improvements augmentation offers in terms of imbalance in the pre-treatment period?
-- **Answer**:
+
+
+- **Answer**: I touched on this above, but I think it creates an interpretation problem to the extent that what/which particular units are contributing as donors to the synthetic control is important for the research question. For example, if it's the case that the units are not particularly distinct, then the configuration of units in the synthetic control may not be that meaningful. For this case, however, because the characteristics of the US states tend to be quite different from one another, especially in politics and policies, it may require some more careful interpretation. 
+
+For instance, the top donor for synthetic Louisiana was New Jersey in both regular and augmented estimations. Some of the other donors make more sense (especially those in the South, like Tennessee, Alabama, Texas), but I'm not sure how I would explain why New Jersey. 
 
 # Staggered Adoption Synthetic Control
 
