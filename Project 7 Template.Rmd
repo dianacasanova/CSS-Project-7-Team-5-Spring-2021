@@ -8,19 +8,20 @@ output: html_document
 # Install and load packages 
 if (!require("pacman")) install.packages("pacman")
 
-devtools::install_github("ebenmichael/augsynth")
+if (!require("augsynth")) devtools::install_github("ebenmichael/augsynth")
 
 pacman::p_load(# Tidyverse packages including dplyr and ggplot2 
                tidyverse,
                ggthemes,
                augsynth,
-               gsynth)
+               gsynth,
+               directlabels)
 
 # set seed
 set.seed(1)
 
 # load data
-medicaid_expansion <- read_csv('data/medicaid_expansion.csv')
+medicaid_expansion <- read_csv('medicaid_expansion.csv')
 ```
 
 # Introduction
@@ -56,11 +57,82 @@ Create plots and provide 1-2 sentence analyses to answer the following questions
 
 ```{r}
 # highest and lowest uninsured rates
+
+top5 <- medicaid_expansion %>% filter(year == 2014) %>% arrange(uninsured_rate) %>% top_n(c(5)) %>% select(State)
+
+bot5 <- medicaid_expansion %>% filter(year == 2014) %>% arrange(uninsured_rate) %>% top_n(c(-5)) %>% select(State)
+
+p <- medicaid_expansion %>% 
+  filter(year <= 2014) %>%
+  filter(State %in% c(unlist(top5), unlist(bot5))) %>%
+  ggplot(., aes(x = year, 
+                y = uninsured_rate, 
+                color = State)) + 
+  geom_line() +
+  scale_colour_discrete(guide = 'none') + 
+  ggtitle('5 Highest and 5 Lowest Uninsured Rates by State, 2014') +
+  xlab('Year') +
+  ylab('Uninsured Rate')  + expand_limits(x = 2015)
+
+direct.label(p, method = "last.qp")
+
+
+
+
+
 ```
 
 ```{r}
 # most uninsured Americans
+
+top5 <- medicaid_expansion %>% 
+  filter(year == 2014) %>% 
+  mutate(num_uninsured = uninsured_rate * population) %>%
+  arrange(num_uninsured) %>% 
+  top_n(c(5)) %>% 
+  select(State)
+
+bot5 <- medicaid_expansion %>% 
+  filter(year == 2014) %>% 
+  mutate(num_uninsured = uninsured_rate * population) %>%
+  arrange(num_uninsured) %>% 
+  top_n(c(-5)) %>% 
+  select(State)
+
+p <- medicaid_expansion %>% 
+  filter(year <= 2014) %>%
+  filter(State %in% unlist(top5)) %>%
+  mutate(num_uninsured = uninsured_rate * population) %>%
+  ggplot(., aes(x = year, 
+                y = num_uninsured, 
+                color = State)) + 
+  geom_line() +
+  scale_colour_discrete(guide = 'none') + 
+  ggtitle('5 Highest Uninsured Individuals by State, 2014') +
+  xlab('Year') +
+  ylab('Uninsured Number')  + expand_limits(x = 2015)
+
+direct.label(p, method = "last.qp")
+
+p <- medicaid_expansion %>% 
+  filter(year <= 2014) %>%
+  filter(State %in% unlist(bot5)) %>%
+  mutate(num_uninsured = uninsured_rate * population) %>%
+  ggplot(., aes(x = year, 
+                y = num_uninsured, 
+                color = State)) + 
+  geom_line() +
+  scale_colour_discrete(guide = 'none') + 
+  ggtitle('5  Least Uninsured Individuals by State, 2014') +
+  xlab('Year') +
+  ylab('Uninsured Number')  + expand_limits(x = 2015)
+
+direct.label(p, method = "last.qp")
+
+
+
 ```
+
 
 
 # Difference-in-Differences Estimation
